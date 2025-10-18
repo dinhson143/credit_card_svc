@@ -89,6 +89,7 @@ jobs:
 
       - name: Deploy infrastructure with CDK
         run: |
+          npm install -g aws-cdk@2.179.0
           cdk bootstrap aws://${{ env.AWS_ACCOUNT }}/${{ env.AWS_REGION }}
           cdk deploy --all --require-approval never
         shell: bash
