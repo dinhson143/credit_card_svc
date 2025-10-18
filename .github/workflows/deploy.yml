@@ -12,6 +12,7 @@ env:
   AWS_REGION: ap-southeast-1
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_ACCOUNT: '575755867754'
 
 jobs:
   build:
@@ -88,6 +89,6 @@ jobs:
 
       - name: Deploy infrastructure with CDK
         run: |
-          cdk bootstrap aws://${{ env.AWS_ACCESS_KEY_ID }}@${{ env.AWS_REGION }}
+          cdk bootstrap aws://${{ env.AWS_ACCOUNT }}@${{ env.AWS_REGION }}
           cdk deploy --all --require-approval never
         shell: bash
