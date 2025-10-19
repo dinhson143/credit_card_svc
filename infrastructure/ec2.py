@@ -35,37 +35,27 @@ class InfrastructureStack(Stack):
 
         user_data = ec2.UserData.for_linux()
         user_data.add_commands(
-                # Update and install base packages
+                # Update base packages
                 "yum update -y",
-                "yum install -y git gcc openssl-devel bzip2-devel libffi-devel zlib-devel xz-devel wget make amazon-cloudwatch-agent --allowerasing",
 
-                # Install Python 3.12 manually
-                "cd /tmp",
-                "wget https://www.python.org/ftp/python/3.12.7/Python-3.12.7.tgz",
-                "tar -xzf Python-3.12.7.tgz",
-                "cd Python-3.12.7",
-                "./configure --enable-optimizations",
-                "make altinstall",
+                # Install dependencies including Python 3.12 and CloudWatch agent
+                "yum install -y git curl python3.12 python3.12-pip amazon-cloudwatch-agent",
 
-                # Verify installation
-                "python3.12 --version",
+                # Set python3.12 as default
+                "alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1",
+                "alternatives --install /usr/bin/pip3 pip3 /usr/bin/pip3.12 1",
 
-                # Install Poetry using Python 3.12
-                "curl -sSL https://install.python-poetry.org | python3.12 -",
+                # Install Poetry as ec2-user
+                "runuser -l ec2-user -c 'curl -sSL https://install.python-poetry.org | python3 -'",
 
-                # Ensure Poetry is available
-                "export PATH=$PATH:/home/ec2-user/.local/bin",
-                "echo 'export PATH=$PATH:/home/ec2-user/.local/bin' >> /home/ec2-user/.bashrc",
+                # Add Poetry to PATH permanently
+                "echo 'export PATH=$HOME/.local/bin:$PATH' >> /home/ec2-user/.bashrc",
 
-                # Clone repository
-                "cd /home/ec2-user || exit 1",
-                "git clone https://github.com/dinhson143/credit_card_svc.git || exit 1",
-                "cd credit_card_svc || exit 1",
+                # Clone your repo
+                "runuser -l ec2-user -c 'cd ~ && git clone https://github.com/dinhson143/credit_card_svc.git'",
 
-                # Configure Poetry environment to use Python 3.12
-                "/home/ec2-user/.local/bin/poetry env use python3.12",
-                "/home/ec2-user/.local/bin/poetry config virtualenvs.create false",
-                "/home/ec2-user/.local/bin/poetry install --no-root",
+                # Install dependencies using Poetry
+                "runuser -l ec2-user -c 'source ~/.bashrc && cd ~/credit_card_svc && poetry env use python3.12 && poetry install --no-root'",
 
                 # Create log directory
                 "mkdir -p /var/log/credit_card_svc",
@@ -83,8 +73,7 @@ class InfrastructureStack(Stack):
                 "-a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/config.json -s",
 
                 # Run FastAPI app (port 80)
-                "nohup /home/ec2-user/.local/bin/poetry run uvicorn src.main:app --host 0.0.0.0 --port 80 "
-                "> /var/log/credit_card_svc/uvicorn.log 2>&1 &"
+                "runuser -l ec2-user -c 'source ~/.bashrc && cd ~/credit_card_svc && nohup poetry run uvicorn src.main:app --host 0.0.0.0 --port 80 > /var/log/credit_card_svc/uvicorn.log 2>&1 &'"
         )
 
         ec2.Instance(
