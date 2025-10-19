@@ -1,6 +1,7 @@
 from aws_cdk import (
     Stack,
     aws_ec2 as ec2,
+    aws_iam as iam,
 )
 from constructs import Construct
 
@@ -22,10 +23,20 @@ class InfrastructureStack(Stack):
         sg.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(22), "Allow SSH")
         sg.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(80), "Allow HTTP")
 
+        role = iam.Role(
+                self,
+                "EC2RoleWithCWLogs",
+                assumed_by=iam.ServicePrincipal("ec2.amazonaws.com"),
+                managed_policies=[
+                    iam.ManagedPolicy.from_aws_managed_policy_name("AmazonSSMManagedInstanceCore"),
+                    iam.ManagedPolicy.from_aws_managed_policy_name("CloudWatchAgentServerPolicy")
+                ],
+        )
+
         user_data = ec2.UserData.for_linux()
         user_data.add_commands(
                 "yum update -y",
-                "yum install -y git python3 python3-pip curl",
+                "yum install -y git python3 python3-pip curl amazon-cloudwatch-agent",
                 "curl -sSL https://install.python-poetry.org | python3 -",
                 "export PATH=$PATH:/root/.local/bin",
                 "cd /home/ec2-user",
@@ -33,17 +44,26 @@ class InfrastructureStack(Stack):
                 "cd credit_card_svc",
                 "~/.local/bin/poetry config virtualenvs.create false",
                 "~/.local/bin/poetry install --no-root",
-                "nohup ~/.local/bin/poetry run uvicorn src.main:app --host 0.0.0.0 --port 80 &",
+                "mkdir -p /var/log/credit_card_svc",
+                "nohup ~/.local/bin/poetry run uvicorn src.main:app --host 0.0.0.0 --port 80 "
+                "> /var/log/credit_card_svc/uvicorn.log 2>&1 &",
+                "echo '{\"logs\": {\"logs_collected\": {\"files\": {\"collect_list\": ["
+                "{\"file_path\": \"/var/log/credit_card_svc/uvicorn.log\","
+                "\"log_group_name\": \"/credit-card-svc\","
+                "\"log_stream_name\": \"{instance_id}\","
+                "\"timestamp_format\": \"%Y-%m-%d %H:%M:%S\"}"
+                "]}}}' > /opt/aws/amazon-cloudwatch-agent/config.json",
+                "amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/config.json -s"
         )
 
         ec2.Instance(
                 self,
-                f"credit-card-svc-{pr_number if pr_number else "master"}",
+                f"credit-card-svc-{pr_number if pr_number else 'master'}",
                 vpc=vpc,
                 instance_type=ec2.InstanceType("t3.micro"),
                 machine_image=ec2.MachineImage.latest_amazon_linux2023(),
                 security_group=sg,
                 user_data=user_data,
                 key_name="test",
+                role=role,
         )
-
