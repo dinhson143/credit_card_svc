@@ -36,7 +36,7 @@ class InfrastructureStack(Stack):
         user_data = ec2.UserData.for_linux()
         user_data.add_commands(
                 "yum update -y",
-                "yum install -y git python3 python3-pip curl amazon-cloudwatch-agent --allowerasing",
+                "yum install -y git python3 python3-pip amazon-cloudwatch-agent --allowerasing",
                 "curl -sSL https://install.python-poetry.org | python3 -",
                 "export PATH=$PATH:/home/ec2-user/.local/bin",
                 "cd /home/ec2-user || exit 1",
