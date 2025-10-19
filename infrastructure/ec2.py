@@ -87,7 +87,7 @@ class InfrastructureStack(Stack):
 
                 # --- Run FastAPI app on port 80 (as ec2-user, detached) ---
                 "runuser -l ec2-user -c 'source ~/.bashrc && cd ~/credit_card_svc && "
-                "nohup poetry run uvicorn src.main:app --host 0.0.0.0 --port 80 "
+                "nohup poetry run uvicorn src.main:app --host 0.0.0.0 --port 8000 "
                 "> /var/log/credit_card_svc/uvicorn.log 2>&1 &'"
         )
 
