@@ -45,15 +45,16 @@ class InfrastructureStack(Stack):
                 "~/.local/bin/poetry config virtualenvs.create false",
                 "~/.local/bin/poetry install --no-root",
                 "mkdir -p /var/log/credit_card_svc",
-                "nohup ~/.local/bin/poetry run uvicorn src.main:app --host 0.0.0.0 --port 80 "
-                "> /var/log/credit_card_svc/uvicorn.log 2>&1 &",
                 "echo '{\"logs\": {\"logs_collected\": {\"files\": {\"collect_list\": ["
                 "{\"file_path\": \"/var/log/credit_card_svc/uvicorn.log\","
                 "\"log_group_name\": \"/credit-card-svc\","
                 "\"log_stream_name\": \"{instance_id}\","
                 "\"timestamp_format\": \"%Y-%m-%d %H:%M:%S\"}"
-                "]}}}' > /opt/aws/amazon-cloudwatch-agent/config.json",
-                "amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/config.json -s"
+                "]}}}}' > /opt/aws/amazon-cloudwatch-agent/config.json",
+                "/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl "
+                "-a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/config.json -s",
+                "nohup ~/.local/bin/poetry run uvicorn src.main:app --host 0.0.0.0 --port 80 "
+                "> /var/log/credit_card_svc/uvicorn.log 2>&1 &"
         )
 
         ec2.Instance(
