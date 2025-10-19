@@ -36,12 +36,12 @@ class InfrastructureStack(Stack):
         user_data = ec2.UserData.for_linux()
         user_data.add_commands(
                 "yum update -y",
-                "yum install -y git python3 python3-pip curl amazon-cloudwatch-agent",
+                "yum install -y git python3 python3-pip curl amazon-cloudwatch-agent --allowerasing",
                 "curl -sSL https://install.python-poetry.org | python3 -",
-                "export PATH=$PATH:/root/.local/bin",
-                "cd /home/ec2-user",
-                "git clone https://github.com/dinhson143/credit_card_svc.git",
-                "cd credit_card_svc",
+                "export PATH=$PATH:/home/ec2-user/.local/bin",
+                "cd /home/ec2-user || exit 1",
+                "git clone https://github.com/dinhson143/credit_card_svc.git || exit 1",
+                "cd credit_card_svc || exit 1",
                 "~/.local/bin/poetry config virtualenvs.create false",
                 "~/.local/bin/poetry install --no-root",
                 "mkdir -p /var/log/credit_card_svc",
