@@ -39,7 +39,7 @@ class InfrastructureStack(Stack):
                 "yum update -y",
 
                 # Install dependencies including Python 3.12 and CloudWatch agent
-                "yum install -y git curl python3.12 python3.12-pip amazon-cloudwatch-agent",
+                "yum install -y git python3.12 python3.12-pip amazon-cloudwatch-agent",
 
                 # Set python3.12 as default
                 "alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1",
