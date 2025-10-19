@@ -73,7 +73,9 @@ jobs:
           node-version: 20
 
       - name: Install AWS CDK
-        run: npm install -g aws-cdk-lib@latest
+        run: |
+          npm install -g aws-cdk@latest
+          echo "$(npm bin -g)" >> $GITHUB_PATH
 
       - name: Set up Python & Poetry for CDK
         uses: actions/setup-python@v5
@@ -89,6 +91,5 @@ jobs:
 
       - name: Deploy infrastructure with CDK
         run: |
-          cdk bootstrap aws://${{ env.AWS_ACCOUNT }}/${{ env.AWS_REGION }}
           cdk deploy --all --require-approval never
         shell: bash
