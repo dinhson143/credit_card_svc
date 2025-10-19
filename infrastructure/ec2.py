@@ -35,24 +35,37 @@ class InfrastructureStack(Stack):
 
         user_data = ec2.UserData.for_linux()
         user_data.add_commands(
+                # Update system and install necessary packages
                 "yum update -y",
                 "yum install -y git python3 python3-pip amazon-cloudwatch-agent --allowerasing",
+
+                # Install Poetry
                 "curl -sSL https://install.python-poetry.org | python3 -",
                 "export PATH=$PATH:/home/ec2-user/.local/bin",
+
+                # Clone repository and install dependencies
                 "cd /home/ec2-user || exit 1",
                 "git clone https://github.com/dinhson143/credit_card_svc.git || exit 1",
                 "cd credit_card_svc || exit 1",
                 "~/.local/bin/poetry config virtualenvs.create false",
                 "~/.local/bin/poetry install --no-root",
+
+                # Create log directory
                 "mkdir -p /var/log/credit_card_svc",
+
+                # Configure CloudWatch Agent to collect uvicorn logs
                 "echo '{\"logs\": {\"logs_collected\": {\"files\": {\"collect_list\": ["
                 "{\"file_path\": \"/var/log/credit_card_svc/uvicorn.log\","
                 "\"log_group_name\": \"/credit-card-svc\","
                 "\"log_stream_name\": \"{instance_id}\","
                 "\"timestamp_format\": \"%Y-%m-%d %H:%M:%S\"}"
                 "]}}}}' > /opt/aws/amazon-cloudwatch-agent/config.json",
+
+                # Start CloudWatch Agent
                 "/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl "
                 "-a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/config.json -s",
+
+                # Run uvicorn app in background
                 "nohup ~/.local/bin/poetry run uvicorn src.main:app --host 0.0.0.0 --port 80 "
                 "> /var/log/credit_card_svc/uvicorn.log 2>&1 &"
         )
