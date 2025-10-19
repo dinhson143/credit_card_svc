@@ -36,32 +36,24 @@ class InfrastructureStack(Stack):
 
         user_data = ec2.UserData.for_linux()
         user_data.add_commands(
-                # --- System update & base dependencies ---
                 "yum update -y",
                 "yum install -y git python3.12 python3.12-pip amazon-cloudwatch-agent --allowerasing",
 
-                # --- Set Python 3.12 as default ---
                 "alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1",
                 "alternatives --install /usr/bin/pip3 pip3 /usr/bin/pip3.12 1",
 
-                # --- Install Poetry for ec2-user ---
                 "runuser -l ec2-user -c 'curl -sSL https://install.python-poetry.org | python3 -'",
 
-                # --- Add Poetry to PATH permanently ---
                 "echo 'export PATH=$HOME/.local/bin:$PATH' >> /home/ec2-user/.bashrc",
 
-                # --- Clone the repository ---
                 "runuser -l ec2-user -c 'cd ~ && git clone https://github.com/dinhson143/credit_card_svc.git || (cd ~/credit_card_svc && git pull)'",
 
-                # --- Install project dependencies with Poetry ---
                 "runuser -l ec2-user -c 'source ~/.bashrc && cd ~/credit_card_svc && "
                 "poetry env use python3.12 && poetry install --no-root --no-interaction'",
 
-                # --- Create log folder and fix permissions ---
                 "mkdir -p /var/log/credit_card_svc",
                 "chown -R ec2-user:ec2-user /var/log/credit_card_svc",
 
-                # --- Configure CloudWatch Agent for app logs ---
                 "cat <<EOF > /opt/aws/amazon-cloudwatch-agent/config.json\n"
                 "{\n"
                 "  \"logs\": {\n"
@@ -81,11 +73,9 @@ class InfrastructureStack(Stack):
                 "}\n"
                 "EOF",
 
-                # --- Start CloudWatch Agent ---
                 "/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl "
                 "-a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/config.json -s",
 
-                # --- Run FastAPI app on port 80 (as ec2-user, detached) ---
                 "runuser -l ec2-user -c 'source ~/.bashrc && cd ~/credit_card_svc && "
                 "nohup poetry run uvicorn src.main:app --host 0.0.0.0 --port 8000 "
                 "> /var/log/credit_card_svc/uvicorn.log 2>&1 &'"
