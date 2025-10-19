@@ -22,6 +22,7 @@ class InfrastructureStack(Stack):
         )
         sg.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(22), "Allow SSH")
         sg.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(80), "Allow HTTP")
+        sg.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(8000), "Allow FastAPI")
 
         role = iam.Role(
                 self,
@@ -35,45 +36,59 @@ class InfrastructureStack(Stack):
 
         user_data = ec2.UserData.for_linux()
         user_data.add_commands(
-                # Update base packages
+                # --- System update & base dependencies ---
                 "yum update -y",
+                "yum install -y git python3.12 python3.12-pip amazon-cloudwatch-agent --allowerasing",
 
-                # Install dependencies including Python 3.12 and CloudWatch agent
-                "yum install -y git python3.12 python3.12-pip amazon-cloudwatch-agent",
-
-                # Set python3.12 as default
+                # --- Set Python 3.12 as default ---
                 "alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1",
                 "alternatives --install /usr/bin/pip3 pip3 /usr/bin/pip3.12 1",
 
-                # Install Poetry as ec2-user
+                # --- Install Poetry for ec2-user ---
                 "runuser -l ec2-user -c 'curl -sSL https://install.python-poetry.org | python3 -'",
 
-                # Add Poetry to PATH permanently
+                # --- Add Poetry to PATH permanently ---
                 "echo 'export PATH=$HOME/.local/bin:$PATH' >> /home/ec2-user/.bashrc",
 
-                # Clone your repo
-                "runuser -l ec2-user -c 'cd ~ && git clone https://github.com/dinhson143/credit_card_svc.git'",
+                # --- Clone the repository ---
+                "runuser -l ec2-user -c 'cd ~ && git clone https://github.com/dinhson143/credit_card_svc.git || (cd ~/credit_card_svc && git pull)'",
 
-                # Install dependencies using Poetry
-                "runuser -l ec2-user -c 'source ~/.bashrc && cd ~/credit_card_svc && poetry env use python3.12 && poetry install --no-root'",
+                # --- Install project dependencies with Poetry ---
+                "runuser -l ec2-user -c 'source ~/.bashrc && cd ~/credit_card_svc && "
+                "poetry env use python3.12 && poetry install --no-root --no-interaction'",
 
-                # Create log directory
+                # --- Create log folder and fix permissions ---
                 "mkdir -p /var/log/credit_card_svc",
+                "chown -R ec2-user:ec2-user /var/log/credit_card_svc",
 
-                # Configure CloudWatch Agent
-                "echo '{\"logs\": {\"logs_collected\": {\"files\": {\"collect_list\": ["
-                "{\"file_path\": \"/var/log/credit_card_svc/uvicorn.log\","
-                "\"log_group_name\": \"/credit-card-svc\","
-                "\"log_stream_name\": \"{instance_id}\","
-                "\"timestamp_format\": \"%Y-%m-%d %H:%M:%S\"}"
-                "]}}}}' > /opt/aws/amazon-cloudwatch-agent/config.json",
+                # --- Configure CloudWatch Agent for app logs ---
+                "cat <<EOF > /opt/aws/amazon-cloudwatch-agent/config.json\n"
+                "{\n"
+                "  \"logs\": {\n"
+                "    \"logs_collected\": {\n"
+                "      \"files\": {\n"
+                "        \"collect_list\": [\n"
+                "          {\n"
+                "            \"file_path\": \"/var/log/credit_card_svc/uvicorn.log\",\n"
+                "            \"log_group_name\": \"/credit-card-svc\",\n"
+                "            \"log_stream_name\": \"{instance_id}\",\n"
+                "            \"timestamp_format\": \"%Y-%m-%d %H:%M:%S\"\n"
+                "          }\n"
+                "        ]\n"
+                "      }\n"
+                "    }\n"
+                "  }\n"
+                "}\n"
+                "EOF",
 
-                # Start CloudWatch Agent
+                # --- Start CloudWatch Agent ---
                 "/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl "
                 "-a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/config.json -s",
 
-                # Run FastAPI app (port 80)
-                "runuser -l ec2-user -c 'source ~/.bashrc && cd ~/credit_card_svc && nohup poetry run uvicorn src.main:app --host 0.0.0.0 --port 80 > /var/log/credit_card_svc/uvicorn.log 2>&1 &'"
+                # --- Run FastAPI app on port 80 (as ec2-user, detached) ---
+                "runuser -l ec2-user -c 'source ~/.bashrc && cd ~/credit_card_svc && "
+                "nohup poetry run uvicorn src.main:app --host 0.0.0.0 --port 80 "
+                "> /var/log/credit_card_svc/uvicorn.log 2>&1 &'"
         )
 
         ec2.Instance(
