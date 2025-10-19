@@ -36,7 +36,6 @@ class InfrastructureStack(Stack):
                 "nohup ~/.local/bin/poetry run uvicorn src.main:app --host 0.0.0.0 --port 80 &",
         )
 
-        key_pair = ec2.KeyPair.from_name(self, "KeyPair", "test")
         ec2.Instance(
                 self,
                 f"credit-card-svc-{pr_number if pr_number else "master"}",
@@ -45,6 +44,6 @@ class InfrastructureStack(Stack):
                 machine_image=ec2.MachineImage.latest_amazon_linux2023(),
                 security_group=sg,
                 user_data=user_data,
-                key_pair=key_pair,
+                key_name="test",
         )
 
