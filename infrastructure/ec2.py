@@ -35,25 +35,42 @@ class InfrastructureStack(Stack):
 
         user_data = ec2.UserData.for_linux()
         user_data.add_commands(
-                # Update system and install necessary packages
+                # Update and install base packages
                 "yum update -y",
-                "yum install -y git python3 python3-pip amazon-cloudwatch-agent --allowerasing",
+                "yum install -y git gcc openssl-devel bzip2-devel libffi-devel zlib-devel xz-devel wget make amazon-cloudwatch-agent --allowerasing",
 
-                # Install Poetry
-                "curl -sSL https://install.python-poetry.org | python3 -",
+                # Install Python 3.12 manually
+                "cd /tmp",
+                "wget https://www.python.org/ftp/python/3.12.7/Python-3.12.7.tgz",
+                "tar -xzf Python-3.12.7.tgz",
+                "cd Python-3.12.7",
+                "./configure --enable-optimizations",
+                "make altinstall",
+
+                # Verify installation
+                "python3.12 --version",
+
+                # Install Poetry using Python 3.12
+                "curl -sSL https://install.python-poetry.org | python3.12 -",
+
+                # Ensure Poetry is available
                 "export PATH=$PATH:/home/ec2-user/.local/bin",
+                "echo 'export PATH=$PATH:/home/ec2-user/.local/bin' >> /home/ec2-user/.bashrc",
 
-                # Clone repository and install dependencies
+                # Clone repository
                 "cd /home/ec2-user || exit 1",
                 "git clone https://github.com/dinhson143/credit_card_svc.git || exit 1",
                 "cd credit_card_svc || exit 1",
-                "~/.local/bin/poetry config virtualenvs.create false",
-                "~/.local/bin/poetry install --no-root",
+
+                # Configure Poetry environment to use Python 3.12
+                "/home/ec2-user/.local/bin/poetry env use python3.12",
+                "/home/ec2-user/.local/bin/poetry config virtualenvs.create false",
+                "/home/ec2-user/.local/bin/poetry install --no-root",
 
                 # Create log directory
                 "mkdir -p /var/log/credit_card_svc",
 
-                # Configure CloudWatch Agent to collect uvicorn logs
+                # Configure CloudWatch Agent
                 "echo '{\"logs\": {\"logs_collected\": {\"files\": {\"collect_list\": ["
                 "{\"file_path\": \"/var/log/credit_card_svc/uvicorn.log\","
                 "\"log_group_name\": \"/credit-card-svc\","
@@ -65,8 +82,8 @@ class InfrastructureStack(Stack):
                 "/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl "
                 "-a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/config.json -s",
 
-                # Run uvicorn app in background
-                "nohup ~/.local/bin/poetry run uvicorn src.main:app --host 0.0.0.0 --port 80 "
+                # Run FastAPI app (port 80)
+                "nohup /home/ec2-user/.local/bin/poetry run uvicorn src.main:app --host 0.0.0.0 --port 80 "
                 "> /var/log/credit_card_svc/uvicorn.log 2>&1 &"
         )
 
