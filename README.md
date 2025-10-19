@@ -107,6 +107,8 @@ Validate a credit card number using the **Luhn algorithm**.
   "number": "4539578809285153"
 }
 ```
+### `GET /health`
+Check if the service is running.
 
 
 ## 🧩 Project Structure
